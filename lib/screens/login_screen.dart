@@ -12,7 +12,6 @@ class _LoginScreenState extends State<LoginScreen> {
     bool _obscureText = false;
 
 
-    
     //cerebro de la lógica de las animaciones
     
     StateMachineController? controller;
@@ -25,10 +24,32 @@ class _LoginScreenState extends State<LoginScreen> {
       SMITrigger? trigFail;     // sad bear :(
 
 
+      //1) FocusNode
+      final emailFocus = FocusNode();
+      final passFocus = FocusNode();
+
+      //2. Listeners (GOSSIP, NOSEY, METICHE!!!)
+
+
     @override
     void initState(){
       super.initState();
       _obscureText=true;
+
+      emailFocus.addListener(() {
+      
+      if (emailFocus.hasFocus) {
+          //manos abajo en email
+          isHandsUp?.change(false);
+
+      }
+      });
+
+      passFocus.addListener(() {
+        //manos arriba en password
+        isHandsUp?.change(passFocus.hasFocus);
+      });
+
     }    
 
   @override
@@ -69,20 +90,22 @@ class _LoginScreenState extends State<LoginScreen> {
               // espacio entre oso y texto
               SizedBox(height: 10,),
           
-              // campo de texto
+              // campo de texto de EMAIL
               TextField(
+                //asign email focusnode from override to textfield (call your nosy neighbors)
+                focusNode: emailFocus,
+                
                 onChanged: (value) {
                   if (isHandsUp != null) {
-                    isHandsUp!.change(false);
+                    //no tapar los ojos al escribir email
+                    //isHandsUp!.change
                   }
-
+                  
                   if(isChecking == null) return;
-
                   //activa modo chismoso
                   isChecking!.change(true);
-
-
                 },
+                
                 keyboardType: TextInputType.emailAddress, // <-- para que aparezca @ en móviles
                 decoration: InputDecoration(
                   hintText: "E-Mail",
@@ -95,11 +118,12 @@ class _LoginScreenState extends State<LoginScreen> {
           
               const SizedBox(height: 10,),
           
-              // campo de texto
+              // campo de texto de CONTRASEÑA
               TextField(
+                focusNode: passFocus,
                 onChanged: (value) {
                   if (isHandsUp != null) {
-                    isHandsUp!.change(true);
+                    //isHandsUp!.change(true);
                   }
 
                   if(isChecking == null) return;
@@ -173,4 +197,15 @@ class _LoginScreenState extends State<LoginScreen> {
         )),
     );
   }
+
+
+  //liberación, limpieza, muerte de los focos (recursos)
+  @override
+  void dispose() {
+    // TODO: implement dispose
+    emailFocus.dispose();
+    passFocus.dispose();
+    super.dispose();
+  }
+
 }
