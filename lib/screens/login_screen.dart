@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 
+//3.1 importar librería para timer
+import 'dart:async';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -23,13 +26,18 @@ class _LoginScreenState extends State<LoginScreen> {
       SMITrigger? trigSuccess;  // happy bear. elated bear
       SMITrigger? trigFail;     // sad bear :(
 
+      // 2.1 variable p/recorrido de ojos
+      SMINumber? numLook;
 
       //1) FocusNode
       final emailFocus = FocusNode();
       final passFocus = FocusNode();
 
-      //2. Listeners (GOSSIP, NOSEY, METICHE!!!)
+    // 3.2 timer para detener la mirada al dejar de teclear
+      Timer? _typingDebounce;
 
+
+    //2. Listeners (GOSSIP, NOSEY, METICHE!!!
 
     @override
     void initState(){
@@ -42,6 +50,9 @@ class _LoginScreenState extends State<LoginScreen> {
           //manos abajo en email
           isHandsUp?.change(false);
 
+          //2.2 mirada neutral del oso when email is in focus
+          numLook?.value = 50.0; // <-- value must be a double as per RIVE requirements
+          isHandsUp?.change(false);
       }
       });
 
@@ -84,21 +95,44 @@ class _LoginScreenState extends State<LoginScreen> {
                     trigSuccess = controller!.findSMI("trigSucess");
                     trigFail = controller!.findSMI("trigFail");
 
+                    // 2.3 enlazar variable numLook con la animación
+                    numLook = controller!.findSMI("numLook");
+
                   }
               )),
               
               // espacio entre oso y texto
               SizedBox(height: 10,),
           
-              // campo de texto de EMAIL
+
+              // EMAIL
               TextField(
                 //asign email focusnode from override to textfield (call your nosy neighbors)
                 focusNode: emailFocus,
                 
                 onChanged: (value) {
+                
+                //2.4 Implementing numLook (moving eyes)
                   if (isHandsUp != null) {
-                    //no tapar los ojos al escribir email
-                    //isHandsUp!.change
+                    //"Estoy escribiendo"
+                    isChecking!.change(true);
+
+                    //ajuste de limites de 0 a 100
+                      //80.0 = medida de calibración
+                    final look = (value.length / 80.0 * 100.0).clamp(0.0, 100.0);
+                    numLook?.value = look;
+
+                    //3.3 Debounce: si vuelve a teclear, reinicia el contador
+                    _typingDebounce?.cancel(); //cancela cualquier timer existente
+
+                    _typingDebounce = Timer(const Duration(milliseconds: 2000), () {
+                      if(!mounted) {
+                        return; // <-- si la pantalla se cierra, stop execution
+                      }
+                      //mirada neutra
+                      isChecking?.change(false);
+
+                    });
                   }
                   
                   if(isChecking == null) return;
@@ -205,6 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
     // TODO: implement dispose
     emailFocus.dispose();
     passFocus.dispose();
+    _typingDebounce?.cancel();
     super.dispose();
   }
 
