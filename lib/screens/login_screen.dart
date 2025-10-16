@@ -36,6 +36,68 @@ class _LoginScreenState extends State<LoginScreen> {
     // 3.2 timer para detener la mirada al dejar de teclear
       Timer? _typingDebounce;
 
+      //4.1 Controller <-- this guy isn't just nosy, he's a stalker
+      final emailCtrl = TextEditingController();
+      final passCtrl = TextEditingController();
+
+      //4.2 Errores para mostrar en la UI. Your regular user should not be seeing SQL errors. Pls.
+      String? emailError;
+      String? passError;
+
+      //4.3 Validadores <-- these guys are the bouncers at the club
+      bool isValidEmail(String email) {
+        
+        final re = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+        return re.hasMatch(email);
+
+      }
+
+      bool isValidPassword(String pass) {
+        // mínimo 8, una mayúscula, una minúscula, un dígito y un especial
+        final re = RegExp(
+          r'^(?=.[a-z])(?=.[A-Z])(?=.\d)(?=.[^A-Za-z0-9]).{8,}$',
+        );
+        return re.hasMatch(pass);
+      }
+
+    //4.4 Acción al botón
+
+    void _onLogin() { //<-- método privado solo accedido en esta clase
+      final email = emailCtrl.text.trim();
+      final pass = passCtrl.text.trim();
+
+
+      //recalcular errores
+
+      final emailE = isValidEmail(email) ? null : "Email inválido";
+
+      final passwordE = isValidPassword(pass) ? null : 
+        "Mínimo 8 caractéres, 1 mayúscula, 1 minúscula, 1 número y un caracter especial";
+
+      // para avisar que hubo un cambio
+        setState(() {
+          emailError = emailE;
+          passError = passwordE;
+        });
+
+      // 4.5 cerrar teclado, bajar manos
+      FocusScope.of(context).unfocus();
+      _typingDebounce?.cancel();
+      isChecking?.change(false);
+      isHandsUp?.change(false);
+      numLook?.value = 50.0;  //mirada neutral
+
+
+      //4.6 activar triggers
+      if (emailE == null && passwordE == null){
+        trigSuccess?.fire();
+        } else {
+          trigFail?.fire();
+            }
+
+      }
+
+
 
     //2. Listeners (GOSSIP, NOSEY, METICHE!!!
 
@@ -109,31 +171,35 @@ class _LoginScreenState extends State<LoginScreen> {
               TextField(
                 //asign email focusnode from override to textfield (call your nosy neighbors)
                 focusNode: emailFocus,
+
+                // 4.8 enlazar controller al TextField
+                controller: emailCtrl,
                 
                 onChanged: (value) {
                 
                 //2.4 Implementing numLook (moving eyes)
-                  if (isHandsUp != null) {
+                  
                     //"Estoy escribiendo"
-                    isChecking!.change(true);
+                  isChecking!.change(true);
 
                     //ajuste de limites de 0 a 100
                       //80.0 = medida de calibración
-                    final look = (value.length / 80.0 * 100.0).clamp(0.0, 100.0);
-                    numLook?.value = look;
+                  final look = (value.length / 80.0 * 100.0).clamp(0.0, 100.0);
+                  numLook?.value = look;
 
                     //3.3 Debounce: si vuelve a teclear, reinicia el contador
-                    _typingDebounce?.cancel(); //cancela cualquier timer existente
+                  _typingDebounce?.cancel(); //cancela cualquier timer existente
 
-                    _typingDebounce = Timer(const Duration(milliseconds: 2000), () {
-                      if(!mounted) {
-                        return; // <-- si la pantalla se cierra, stop execution
-                      }
+                  _typingDebounce = Timer(const Duration(milliseconds: 2000), () {
+                  
+                    if(!mounted) {
+                      return; // <-- si la pantalla se cierra, stop execution
+                    }
                       //mirada neutra
-                      isChecking?.change(false);
+                    isChecking?.change(false);
 
-                    });
-                  }
+                  });
+                  
                   
                   if(isChecking == null) return;
                   //activa modo chismoso
@@ -142,6 +208,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 
                 keyboardType: TextInputType.emailAddress, // <-- para que aparezca @ en móviles
                 decoration: InputDecoration(
+                  //4.9 mostrar el texto del error
+                  errorText: emailError,
                   hintText: "E-Mail",
                   prefixIcon: const Icon(Icons.mail),
                   border: OutlineInputBorder(
@@ -155,6 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
               // campo de texto de CONTRASEÑA
               TextField(
                 focusNode: passFocus,
+                controller: passCtrl,
                 onChanged: (value) {
                   if (isHandsUp != null) {
                     //isHandsUp!.change(true);
@@ -163,17 +232,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   if(isChecking == null) return;
 
                   //activa modo chismoso
-                  isChecking!.change(false);
+                  isChecking!.change(true);
 
 
                 },
                 obscureText: _obscureText,
                 decoration: InputDecoration(
-                  hintText: "Password",
-                  prefixIcon: const Icon(Icons.key),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
+                    hintText: "Password",
+                    prefixIcon: const Icon(Icons.key),
+                    errorText: passError,
                     suffixIcon: IconButton(
                       icon: Icon(_obscureText ? Icons.visibility : Icons.visibility_off,),
                       onPressed: () {
@@ -208,8 +278,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)
                 ),
-                onPressed: () {},
-                child: Text("Login,",
+                //4.10 llamar función de login
+                onPressed: _onLogin,
+                child: Text("Login",
                   style: TextStyle(color: Colors.white),),),
               const SizedBox(height: 10,),
 
@@ -237,6 +308,9 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void dispose() {
     // TODO: implement dispose
+    //4.11 limpieza de los controllers
+    emailCtrl.dispose();
+    passCtrl.dispose();
     emailFocus.dispose();
     passFocus.dispose();
     _typingDebounce?.cancel();
