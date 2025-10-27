@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:rive/rive.dart';
 
 //3.1 importar librería para timer
@@ -44,6 +45,30 @@ class _LoginScreenState extends State<LoginScreen> {
       String? emailError;
       String? passError;
 
+
+        bool isLoading = false; // NUEVO - deshabilita el botón y muestra spinner
+
+      // NUEVO - Validación dinámica de email
+      String? firstEmailError(String text) {
+        final value = text.trim();
+        if (value.isEmpty) return null; // no mostrar error si está vacío
+        final emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+        if (!emailRegex.hasMatch(value)) return 'Email no válido';
+        return null;
+      }
+
+      // NUEVO - Validación dinámica de contraseña
+      String? firstPasswordError(String text) {
+        final p = text;
+        if (p.isEmpty) return 'La contraseña no puede estar vacía';
+        if (p.length < 8) return 'Mínimo 8 caracteres';
+        if (!RegExp(r'[A-Z]').hasMatch(p)) return 'Debe incluir una mayúscula';
+        if (!RegExp(r'[a-z]').hasMatch(p)) return 'Debe incluir una minúscula';
+        if (!RegExp(r'\d').hasMatch(p)) return 'Debe incluir un número';
+        if (!RegExp(r'[^A-Za-z0-9]').hasMatch(p)) return 'Debe incluir un caracter especial';
+        return null;
+      }
+
       //4.3 Validadores <-- these guys are the bouncers at the club
       bool isValidEmail(String email) {
         
@@ -52,76 +77,82 @@ class _LoginScreenState extends State<LoginScreen> {
 
       }
 
-bool isValidPassword(String pass) {
-    // mínimo 8, una mayúscula, una minúscula, un dígito y un especial
-    final re = RegExp(
-      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$',
-    );
-    return re.hasMatch(pass);
-  }
+      bool isValidPassword(String pass) {
+          // mínimo 8, una mayúscula, una minúscula, un dígito y un especial
+          final re = RegExp(
+            r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$',
+          );
+          return re.hasMatch(pass);
+        }
 
     //4.4 Acción al botón
 
-    void _onLogin() { //<-- método privado solo accedido en esta clase
+    Future<void> _onLogin() async {
+
+      if (isLoading) return; // NUEVO - evita que se presione varias veces
+
       final email = emailCtrl.text.trim();
-      final pass = passCtrl.text.trim();
+      final password = passCtrl.text;
 
+      final eError = firstEmailError(email); // NUEVO - usa nuevo validador
+      final pError = firstPasswordError(password); // NUEVO - usa nuevo validador
 
-      //recalcular errores
+      setState(() {
+        emailError = eError;
+        passError = pError;
+        isLoading = true; // NUEVO - activa estado de carga
+      });
 
-      final emailE = isValidEmail(email) ? null : "Email inválido";
-
-      final passwordE = isValidPassword(pass) ? null : 
-        "Mínimo 8 caractéres, 1 mayúscula, 1 minúscula, 1 número y un caracter especial";
-
-      // para avisar que hubo un cambio
-        setState(() {
-          emailError = emailE;
-          passError = passwordE;
-        });
-
-      // 4.5 cerrar teclado, bajar manos
+      // Normalizar el estado antes del trigger
       FocusScope.of(context).unfocus();
       _typingDebounce?.cancel();
       isChecking?.change(false);
       isHandsUp?.change(false);
-      numLook?.value = 50.0;  //mirada neutral
+      numLook?.value = 50.0; // mirada neutral
 
+      // NUEVO - Esperar un frame antes de disparar trigger (soluciona doble tap)
+      await SchedulerBinding.instance.endOfFrame;
 
-      //4.6 activar triggers
-      if (emailE == null && passwordE == null){
-        trigSuccess?.fire();
+      // NUEVO - Simular "envío" de datos con un pequeño delay
+      await Future.delayed(const Duration(seconds: 1));
+
+      if (eError == null && pError == null) {
+        trigSuccess?.fire(); // NUEVO - trigger éxito
         } else {
-          trigFail?.fire();
-            }
+          trigFail?.fire(); // NUEVO - trigger fallo
+          }
 
+      if (mounted) {
+        setState(() {
+          isLoading = false; // NUEVO - reactivar botón después del envío
+          });
+        }
       }
 
-
-
+    
     //2. Listeners (GOSSIP, NOSEY, METICHE!!!
 
     @override
-    void initState(){
-      super.initState();
-      _obscureText=true;
+      void initState(){
+        super.initState();
+        _obscureText=true;
 
-      emailFocus.addListener(() {
-      
-      if (emailFocus.hasFocus) {
-          //manos abajo en email
-          isHandsUp?.change(false);
+        emailFocus.addListener(() {
+        
+          if (emailFocus.hasFocus) {
+              //manos abajo en email
+              isHandsUp?.change(false);
 
-          //2.2 mirada neutral del oso when email is in focus
-          numLook?.value = 50.0; // <-- value must be a double as per RIVE requirements
-          isHandsUp?.change(false);
-      }
-      });
+              //2.2 mirada neutral del oso when email is in focus
+              numLook?.value = 50.0; // <-- value must be a double as per RIVE requirements
+              isHandsUp?.change(false);
+            }
+        });
 
-      passFocus.addListener(() {
-        //manos arriba en password
-        isHandsUp?.change(passFocus.hasFocus);
-      });
+        passFocus.addListener(() {
+          //manos arriba en password
+          isHandsUp?.change(passFocus.hasFocus);
+        });
 
     }    
 
@@ -154,7 +185,7 @@ bool isValidPassword(String pass) {
                     artboard.addController(controller!);
                     isChecking = controller!.findSMI("isChecking");
                     isHandsUp = controller!.findSMI("isHandsUp");
-                    trigSuccess = controller!.findSMI("trigSucess");
+                    trigSuccess = controller!.findSMI("trigSuccess");
                     trigFail = controller!.findSMI("trigFail");
 
                     // 2.3 enlazar variable numLook con la animación
@@ -177,15 +208,17 @@ bool isValidPassword(String pass) {
                 
                 onChanged: (value) {
                 
+                  setState(() {
+                      emailError = firstEmailError(value);
+                    });
+                  
                 //2.4 Implementing numLook (moving eyes)
                   
-                    //"Estoy escribiendo"
-                  isChecking!.change(true);
-
-                    //ajuste de limites de 0 a 100
-                      //80.0 = medida de calibración
-                  final look = (value.length / 80.0 * 100.0).clamp(0.0, 100.0);
-                  numLook?.value = look;
+                  if (isChecking != null) {
+                    isChecking!.change(true);
+                    final look = ((value.length / 80.0) * 100.0).clamp(0.0, 100.0).toDouble();
+                    numLook?.value = look;
+                  }
 
                     //3.3 Debounce: si vuelve a teclear, reinicia el contador
                   _typingDebounce?.cancel(); //cancela cualquier timer existente
@@ -193,17 +226,14 @@ bool isValidPassword(String pass) {
                   _typingDebounce = Timer(const Duration(milliseconds: 2000), () {
                   
                     if(!mounted) {
-                      return; // <-- si la pantalla se cierra, stop execution
+                      isChecking?.change(false);
+                      numLook?.value = 50.0;// <-- si la pantalla se cierra, stop execution
                     }
                       //mirada neutra
                     isChecking?.change(false);
 
                   });
                   
-                  
-                  if(isChecking == null) return;
-                  //activa modo chismoso
-                  isChecking!.change(true);
                 },
                 
                 keyboardType: TextInputType.emailAddress, // <-- para que aparezca @ en móviles
@@ -217,7 +247,29 @@ bool isValidPassword(String pass) {
                   )
                 ),
               ),
+
+              if (emailCtrl.text.trim().isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        emailError == null ? Icons.check_circle : Icons.error,
+                        size: 18,
+                        color: emailError == null ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        emailError ?? 'Email válido',
+                        style: TextStyle(
+                          color: emailError == null ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
           
+
               const SizedBox(height: 10,),
           
               // campo de texto de CONTRASEÑA
@@ -225,15 +277,14 @@ bool isValidPassword(String pass) {
                 focusNode: passFocus,
                 controller: passCtrl,
                 onChanged: (value) {
+
+                  setState(() {
+                    passError = firstPasswordError(value);
+                  });
+
                   if (isHandsUp != null) {
-                    //isHandsUp!.change(true);
+                    isHandsUp!.change(true);
                   }
-
-                  if(isChecking == null) return;
-
-                  //activa modo chismoso
-                  isChecking!.change(true);
-
 
                 },
                 obscureText: _obscureText,
@@ -254,6 +305,30 @@ bool isValidPassword(String pass) {
                     }, )
                 ),
               ),
+
+               // NUEVO - Checklist dinámico debajo del password
+              if (passCtrl.text.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        passError == null ? Icons.check_circle : Icons.error,
+                        size: 18,
+                        color: passError == null ? Colors.green : Colors.red,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        passError ?? 'Contraseña válida',
+                        style: TextStyle(
+                          color:
+                              passError == null ? Colors.green : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               SizedBox(height: 10,),
 
               //texto reestablecer contraseña
@@ -274,15 +349,25 @@ bool isValidPassword(String pass) {
               MaterialButton(
                 minWidth: size.width,
                 height: 50,
-                color: Colors.purple,
+                color: Colors.redAccent,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                //4.10 llamar función de login
-                onPressed: _onLogin,
-                child: Text("Login",
-                  style: TextStyle(color: Colors.white),),),
-              const SizedBox(height: 10,),
+                onPressed: isLoading ? null : _onLogin, // NUEVO
+                child: isLoading
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text(
+                        'Login',
+                        style: TextStyle(color: Colors.white),
+                      ),
+              ),
 
               SizedBox(
                 width: size.width,
